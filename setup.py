@@ -29,6 +29,6 @@ setuptools.setup(
         "Operating System :: MacOS :: MacOS X",
         "Operating System :: Microsoft :: Windows",
     ],
-    url="https://github.com/Drelf2018/weibo-poster",
+    url="https://github.com/Drelf2018/submitter",
     python_requires=">=3.8",
 )

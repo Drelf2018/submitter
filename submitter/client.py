@@ -39,6 +39,10 @@ class Client(Api, Credential):
         dedeuserid: str | None = None,
     ):
         """
+        `token` 和 `dedeuserid` 可不填 若不填则自动获取 自动获取需要 `sessdata` 和 `bili_jct`
+
+        如果 同时 填入 `token` 和 `dedeuserid` 则不需要 `sessdata` 和 `bili_jct`
+
         Args:
             url: 基础接口地址
         
@@ -62,12 +66,15 @@ class Client(Api, Credential):
             return None, err
         return User(**data), None
 
-    async def get_self_uid(self) -> str:
+    async def get_self_uid(self) -> Tuple[str, Optional[Exception]]:
         """
         获取自身 uid
         """
-        info = await live.get_self_info(self)
-        return str(info["uid"])
+        try:
+            info = await live.get_self_info(self)
+            return str(info["uid"]), None
+        except Exception as e:
+            return "", e
 
     async def get_self_token(self) -> Tuple[str, Optional[Exception | ApiException]]:
         """
@@ -90,7 +97,9 @@ class Client(Api, Credential):
         if err is not None:
             return err
         if self.dedeuserid is None:
-            self.dedeuserid = await self.get_self_uid()
+            self.dedeuserid, err = await self.get_self_uid()
+            if err is not None:
+                return err
         if user.uid != self.dedeuserid:
             if boom:
                 return ApiException(400, "Login failed.")
