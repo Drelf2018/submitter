@@ -1,3 +1,1 @@
-APScheduler==3.10.4
 bilibili_api_python==16.1.0
-httpx==0.25.0
