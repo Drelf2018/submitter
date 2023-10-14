@@ -110,7 +110,7 @@ class Api(Session):
         """
         提交博文
         """
-        _, err = await self.post("/submit", data=post.data)
+        _, err = await self.post("/submit", data=post.json)
         return err
     
     async def posts(self, begin: int = None, end: int = None) -> List[Post]:

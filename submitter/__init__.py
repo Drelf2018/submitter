@@ -1,11 +1,12 @@
 from .client import Client, Submitter, delta, run_forever
-from .data import Attachment, Job, Post, User, parse
+from .data import Attachment, Blogger, Job, Post, User, parse
 from .network import HEADERS, Api, ApiException, Session
 
 __all__ = [
     "Api",
     "ApiException",
     "Attachment",
+    "Blogger",
     "Client",
     "delta",
     "HEADERS",

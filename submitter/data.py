@@ -10,8 +10,18 @@ class Attachment:
     local: str = ""
     MIME: str = ""
 
+    @property
+    def data(self) -> dict:
+        """
+        返回字典格式对象
+        """
+        return {"url": self.url}
+
     def __str__(self) -> str:
-        return json.dumps({"url": self.url})
+        """
+        返回字典格式经 json 处理后对象
+        """
+        return json.dumps(self.data, ensure_ascii=False)
 
 
 @dataclass
@@ -35,11 +45,7 @@ class User:
 
 
 @dataclass
-class Post:
-    mid: str
-    time: str
-    text: str
-    source: str
+class Blogger:
     platform: str
     uid: str
     name: str
@@ -47,14 +53,37 @@ class Post:
     follower: str
     following: str
     description: str
-
     face: Attachment
     pendant: Attachment
-    attachments: List[Attachment]
 
+    @property
+    def data(self) -> dict:
+        """
+        返回字典格式对象
+        """
+        dic = {}
+        for k, v in self.__dict__.items():
+            if k in ["face", "pendant"]:
+                v: Attachment
+                dic[k] = {} if v is None else v.data
+            else:
+                dic[k] = str(v)
+        return dic
+    
+    def __str__(self) -> str:
+        return json.dumps(self.data, ensure_ascii=False)
+
+
+@dataclass
+class Post:
+    mid: str
+    time: str
+    text: str
+    source: str
+    blogger: Blogger    
     repost: "Post"
     comments: List["Post"]
-
+    attachments: List[Attachment]
     submitter: User = None
 
     @property
@@ -73,20 +102,42 @@ class Post:
         for k, v in self.__dict__.items():
             if k == "submitter":
                 continue
+            elif k == "blogger":
+                dic[k] = self.blogger.data
+            elif k == "attachments":
+                dic[k] = [v.data for v in self.attachments]
+            elif k == "repost":
+                dic[k] = None if self.repost is None else self.repost.data
+            elif k == "comments":
+                dic[k] = [v.data for v in self.comments]
+            else:
+                if v is None:
+                    continue
+                dic[k] = str(v)
+        return dic
+
+    @property
+    def json(self) -> dict:
+        """
+        返回字典格式经 json 处理后对象
+        """
+        dic = {}
+        for k, v in self.__dict__.items():
+            if k == "submitter":
+                continue
             elif k == "attachments":
                 dic[k] = [str(v) for v in self.attachments]
             elif k == "repost":
-                dic[k] = {} if self.repost is None else str(self.repost)
+                dic[k] = "null" if self.repost is None else str(self.repost)
             elif k == "comments":
                 dic[k] = [str(v) for v in self.comments]
             else:
+                if v is None:
+                    continue
                 dic[k] = str(v)
         return dic
 
     def __str__(self) -> str:
-        """
-        返回字符串格式对象
-        """
         return json.dumps(self.data, ensure_ascii=False)
 
 
