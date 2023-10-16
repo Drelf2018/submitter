@@ -4,8 +4,8 @@ from typing import Coroutine, List, Optional, Tuple
 
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
 from bilibili_api import Credential, comment, live
+from loguru import logger
 
-from .data import User
 from .network import Api, ApiException
 
 
@@ -20,7 +20,8 @@ def run_forever(coro: Coroutine, *args, **kwargs):
 
 
 def stop(err: Exception):
-    print(f"{err.__class__.__name__}:", str(err))
+    if err is not None:
+        logger.error(f"{err.__class__.__name__}: {err}")
     asyncio.get_event_loop().stop()
 
 
@@ -57,15 +58,6 @@ class Client(Api, Credential):
         Api.__init__(self, url, token)
         Credential.__init__(self, sessdata=sessdata, bili_jct=bili_jct, dedeuserid=dedeuserid)
 
-    async def check_token_vaild(self) -> Tuple[User, Optional[Exception | ApiException]]:
-        """
-        鉴权
-        """
-        data, err = await self.get("/me")
-        if err is not None:
-            return None, err
-        return User(**data), None
-
     async def get_self_uid(self) -> Tuple[str, Optional[Exception]]:
         """
         获取自身 uid
@@ -80,12 +72,10 @@ class Client(Api, Credential):
         """
         获取自身鉴权码
         """
-        data, err = await self.get("/token", params={"uid": self.dedeuserid})
+        data, err = await self.token(self.dedeuserid)
         if err is not None:
             return "", err
-        resp = await comment.send_comment(data["token"], data["oid"], comment.CommentResourceType.DYNAMIC, credential=self)
-        if resp["success_action"] != 0:
-            return "", ApiException(400, "Send comment failed.")
+        await comment.send_comment(data["token"], data["oid"], comment.CommentResourceType.DYNAMIC, credential=self)
         await asyncio.sleep(2)  # wait for bilibili update comment
         return await self.register(data["auth"])
 
@@ -93,20 +83,19 @@ class Client(Api, Credential):
         """
         登录
         """
-        user, err = await self.check_token_vaild()
-        if err is not None:
-            return err
+        user, _ = await self.me()
         if self.dedeuserid is None:
             self.dedeuserid, err = await self.get_self_uid()
             if err is not None:
                 return err
         if user.uid != self.dedeuserid:
             if boom:
-                return ApiException(400, "Login failed.")
-            self.token, err = await self.get_self_token()
+                return ApiException("/login", 400, "Login failed.")
+            token, err = await self.get_self_token()
             if err is not None:
                 return err
-            return self.login(True)  # double check
+            self.modify_token(token)
+            return await self.login(True)  # double check
 
 
 class Submitter(Client):
@@ -137,13 +126,14 @@ class Submitter(Client):
     """
     async def __run__(self):
         for fn, args, kwargs in self.__once:
-                await fn(*args, **kwargs)
+            await fn(*args, **kwargs)
         self.__scheduler.start()
 
     async def __aenter__(self):
         self.__once: List[Tuple[Coroutine, tuple, dict]] = []
         self.__scheduler = AsyncIOScheduler(timezone="Asia/Shanghai", event_loop=asyncio.get_running_loop())
         self.__vaild = await self.login()
+        logger.info(f"token: {self.token}")
         return self
 
     async def __aexit__(self, typ_, value, trace):
@@ -181,6 +171,8 @@ class Submitter(Client):
                 try:
                     await fn(self)
                     await self.__run__()
+                    if len(self.__scheduler.get_jobs()) == 0:
+                        stop(None)
                 except Exception as e:
                     stop(e)
         run_forever(main)
