@@ -2,7 +2,7 @@ from submitter import *
 
 URL = "http://localhost:9000"
 TOKEN = "********"
-UID = ""
+UID = "188888131"
 
 post = Post(
     mid         = "10086",
