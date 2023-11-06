@@ -129,8 +129,8 @@ class Weibo(Session):
     def data(self, result: Any) -> Any:
         return result["data"]
 
-    async def posts(self, uid: str):
-        data, err = await self.get(f"/container/getIndex?containerid=107603{uid}")
+    async def posts(self, uid: str, page: int = 1):
+        data, err = await self.get(f"/container/getIndex?containerid=107603{uid}&page={page}")
         if err is not None:
             logger.error(err)
             return

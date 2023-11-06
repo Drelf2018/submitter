@@ -1,4 +1,4 @@
-from . import adapters
+from . import adapters, settings
 from .adapters import *
 from .client import Client, Submitter, delta, run_forever
 from .data import Attachment, Attachments, Blogger, Job, Post, User
@@ -18,6 +18,7 @@ __all__ = [
     "Post",
     "run_forever",
     "Session",
+    "settings",
     "Submitter",
     "User",
 ]

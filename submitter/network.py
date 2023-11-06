@@ -2,8 +2,10 @@ from io import BytesIO
 from typing import Any, List, Optional, Tuple
 
 import httpx
+from loguru import logger
 from PIL import Image
 
+from . import settings
 from .data import Job, Online, Post, User
 
 HEADERS = {
@@ -77,8 +79,11 @@ class Session:
             headers = self.headers
         # fetch
         try:
-            # logger.debug(f"\n{method} {url}\n  args: {args}\n  kwargs: {kwargs}\n  headers: {headers}")
+            if settings.DEBUG:
+                logger.debug(f"\n{method} {url}\n  args: {args}\n  kwargs: {kwargs}\n  headers: {headers}")
             resp = await self.__session.request(method, url, headers=headers, *args, **kwargs)
+            # if settings.DEBUG:
+            #     logger.debug(resp.content)
             if resp.status_code != 200:
                 return None, ApiException(url, resp.status_code, f"<Response [{resp.status_code}]>")
             result = resp.json()
@@ -97,31 +102,32 @@ class Session:
         return await self.request("POST", url, headers, *args, **kwargs)
     
     async def must_get(self, url: str, headers: Optional[dict] = None, *args, **kwargs):
-        data, _ = await self.get(url, headers, *args, **kwargs)
-        return data
+        return (await self.get(url, headers, *args, **kwargs))[0]
     
     async def must_post(self, url: str, headers: Optional[dict] = None, *args, **kwargs):
-        data, _ = await self.post(url, headers, *args, **kwargs)
-        return data
+        return (await self.post(url, headers, *args, **kwargs))[0]
     
 
 class Api(Session):
     """
     Api 实现层
     """
-    def __init__(self, url: str, token: str = ""):
+    def __init__(self, url: str, auth: str):
         """
         Args:
             url: 基础接口地址
         
-            token: 鉴权码
+            auth: 鉴权码
         """
-        self.token = token
-        Session.__init__(self, url, {"Authorization": token})
+        self.auth = auth
+        Session.__init__(self, url, {"Authorization": auth})
 
-    def modify_token(self, token: str):
-        self.token = token
-        self.headers["Authorization"] = token
+    def set_auth(self, auth: str):
+        """
+        更新鉴权码
+        """
+        self.auth = auth
+        self.headers["Authorization"] = auth
 
     async def version(self) -> str:
         """
@@ -207,7 +213,7 @@ class Api(Session):
         """
         更新自身在线状态
         """
-        await self.session.get("/ping")
+        await self.get("/ping")
     
     async def me(self) -> Tuple[User, Optional[Exception | ApiException]]:
         """
@@ -248,12 +254,17 @@ class Api(Session):
             return None, err
         return [Job(**job) for job in resp], None
     
+    async def test(self, jobs: List[str]) -> Tuple[List[Job], Optional[Exception | ApiException]]:
+        """
+        测试任务
+        """
+        return await self.get("/test", params={"jobs": jobs})
+
     async def submit(self, post: Post):
         """
         提交博文
         """
-        _, err = await self.post("/submit", data=post.json)
-        return err
+        return (await self.post("/submit", data=post.json))[1]
 
     async def exec(self, cmd: str) -> Tuple[List[str], Optional[Exception | ApiException]]:
         """
@@ -267,6 +278,7 @@ class Api(Session):
         """
         resp, err = await self.get("/users")
         if err is not None:
+            logger.error(err)
             return []
         return [User(**u) for u in resp]
 
@@ -274,8 +286,7 @@ class Api(Session):
         """
         修改权限
         """
-        _, err = await self.get(f"/permission/{uid}/{perm}")
-        return err
+        return (await self.get(f"/permission/{uid}/{perm}"))[1]
 
     async def close(self) -> str:
         """
@@ -283,13 +294,13 @@ class Api(Session):
         """
         return await self.must_get("/close")
     
-    async def clear(self):
+    async def clear(self) -> str:
         """
         删除资源
         """
         return await self.must_get("/clear")
     
-    async def reboot(self):
+    async def reboot(self) -> str:
         """
         删库重启
         """

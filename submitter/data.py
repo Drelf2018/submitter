@@ -36,7 +36,7 @@ class Online:
 
 @dataclass
 class Job:
-    patten: str
+    pattern: str
     method: str
     url: str
     data: Dict[str, str] = field(default_factory=dict)
@@ -61,8 +61,8 @@ class Job:
 @dataclass
 class User:
     uid: str
-    permission: float
     token: str = ""
+    permission: float = 5.1
     jobs: List[Job] = field(default_factory=list)
     listening: List[str] = field(default_factory=list)
 
