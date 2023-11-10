@@ -6,6 +6,7 @@ from apscheduler.schedulers.asyncio import AsyncIOScheduler
 from bilibili_api import Credential, comment, live
 from loguru import logger
 
+from . import settings
 from .network import Api, ApiException
 
 
@@ -29,9 +30,9 @@ class Client(Api, Credential):
         self,
         url: str,
         auth: str | None = None,
+        dedeuserid: str | None = None,
         sessdata: str | None = None,
         bili_jct: str | None = None,
-        dedeuserid: str | None = None,
     ):
         """
         `auth` 和 `dedeuserid` 可不填 若不填则自动获取 自动获取需要 `sessdata` 和 `bili_jct`
@@ -43,11 +44,11 @@ class Client(Api, Credential):
         
             auth: 鉴权码
 
+            dedeuserid: 浏览器 Cookies 中的 DedeUserID 字段值. Defaults to None.
+
             sessdata: 浏览器 Cookies 中的 SESSDATA 字段值. Defaults to None.
 
             bili_jct: 浏览器 Cookies 中的 bili_jct 字段值. Defaults to None.
-
-            dedeuserid: 浏览器 Cookies 中的 DedeUserID 字段值. Defaults to None.
         """
         if auth is None:
             auth = ""
@@ -100,28 +101,14 @@ class Client(Api, Credential):
 
 class Submitter(Client):
     """
-    提交器
-
-    use
-
-    ```python
-    async def main():
-        async with Submitter(url, auth) as sub:
-            @sub.job(0, 1)
-            async def _():
-                pass
+    提交器，示例：
     
-    run_forever(main)
-    ```
-
-    or
-
-    ```
-    @Submitter(url, auth)
+    ```python
+    @Submitter(url=URL, auth=AUTH, dedeuserid=UID)
     async def _(sub: Submitter):
-        @sub.job(0, 1)
+        @sub.once()
         async def _():
-            pass
+            print((await sub.me())[0])
     ```
     """
     async def __aenter__(self):
@@ -148,13 +135,14 @@ class Submitter(Client):
         asyncio.get_event_loop().stop()
 
     async def __run__(self):
-        logger.info(f"auth: {self.auth}")
-        logger.info(f"version: {await self.version()}")
+        logger.info(f"Server@{await self.version()} welcome submitter@{self.auth}")
         if len(self.__once) != 0:
             await asyncio.wait(self.__once)
         if len(self.__scheduler.get_jobs()) == 0:
             asyncio.get_event_loop().stop()
         else:
+            if settings.PING:
+                self.add_job(self.ping, 2, 5)
             self.__scheduler.start()
 
     def __call__(self, fn: Coroutine):
@@ -185,7 +173,7 @@ class Submitter(Client):
         """
         新增任务
         """
-        self.__scheduler.add_job(fn, "interval", next_run_time=delta(start), seconds=interval, args=args, kwargs=kwargs)
+        self.__scheduler.add_job(fn, "interval", next_run_time=delta(start), seconds=interval, max_instances=20, args=args, kwargs=kwargs)
         return fn
 
     def job(self, start: int = 0, interval: int = 5, *args, **kwargs):

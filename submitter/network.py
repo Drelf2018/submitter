@@ -82,8 +82,6 @@ class Session:
             if settings.DEBUG:
                 logger.debug(f"\n{method} {url}\n  args: {args}\n  kwargs: {kwargs}\n  headers: {headers}")
             resp = await self.__session.request(method, url, headers=headers, *args, **kwargs)
-            # if settings.DEBUG:
-            #     logger.debug(resp.content)
             if resp.status_code != 200:
                 return None, ApiException(url, resp.status_code, f"<Response [{resp.status_code}]>")
             result = resp.json()
@@ -245,20 +243,26 @@ class Api(Session):
             return None, err
         return [Job(**job) for job in resp], None
 
-    async def remove(self, jobs: List[str]) -> Tuple[List[Job], Optional[Exception | ApiException]]:
+    async def remove(self, *jobs: str) -> Tuple[List[Job], Optional[Exception | ApiException]]:
         """
         移除任务
         """
-        resp, err = await self.get("/remove", params={"jobs": jobs})
+        resp, err = await self.get("/remove", params={"jobs": list(jobs)})
         if err is not None:
             return None, err
         return [Job(**job) for job in resp], None
-    
-    async def test(self, jobs: List[str]) -> Tuple[List[Job], Optional[Exception | ApiException]]:
+
+    async def test(self, job: Job):
+        """
+        测试单个任务
+        """
+        return await self.post("/test", data=job.json)
+
+    async def tests(self, jobs: List[str]):
         """
         测试任务
         """
-        return await self.get("/test", params={"jobs": jobs})
+        return await self.get("/tests", params={"jobs": jobs})
 
     async def submit(self, post: Post):
         """

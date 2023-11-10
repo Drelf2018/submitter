@@ -7,7 +7,7 @@ from typing import Dict, List
 @dataclass
 class Attachment:
     url: str
-    local: str = ""
+    link: str = ""
     MIME: str = ""
 
     @property
@@ -108,6 +108,7 @@ class Post:
     attachments: List[Attachment]
     repost: "Post" = None
     submitter: User = None
+    platform: str = ""
 
     def set_repost(self, repost: "Post") -> "Post":
         self.repost = repost

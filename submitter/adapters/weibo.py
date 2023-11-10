@@ -123,7 +123,7 @@ class Weibo(Session):
 
     def check_code(self, url: str, result: Any) -> ApiException | None:
         if result["ok"] != 1:
-            return ApiException(url=url, code=result["ok"], **result)
+            return ApiException(url=url, code=result["ok"], message=result["ok"], **result)
         return None
 
     def data(self, result: Any) -> Any:

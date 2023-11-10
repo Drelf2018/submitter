@@ -21,4 +21,10 @@ __all__ = [
     "settings",
     "Submitter",
     "User",
+
+    "comment",
+    "created_at",
+    "created_at_comment",
+    "deep_get",
+    "Weibo",
 ]
