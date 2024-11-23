@@ -6,8 +6,11 @@ with open("README.md", "r", encoding="utf-8") as f:
 with open("requirements.txt", "r", encoding="utf-8") as f:
     requires = f.read()
 
-with open("github.txt", "r", encoding="utf-8") as f:
-    cfg = f.read().split("|")
+try:
+    with open("github.txt", "r", encoding="utf-8") as f:
+        cfg = f.read().split("|")
+except:
+    cfg = ["v0.0.0"]
 
 setuptools.setup(
     name="post-submitter",
@@ -20,7 +23,7 @@ setuptools.setup(
     long_description=long_description,
     packages=setuptools.find_packages(),
     install_requires=requires.splitlines(),
-    keywords=['python', 'weibo', 'webhook'],
+    keywords=["python", "weibo", "webhook"],
     classifiers=[
         "Development Status :: 1 - Planning",
         "Intended Audience :: Developers",

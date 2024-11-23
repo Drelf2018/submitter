@@ -1,2 +1,4 @@
-bilibili_api_python==16.1.0
+APScheduler==3.10.4
+httpx==0.27.2
 loguru==0.7.2
+pydantic==2.10.1
