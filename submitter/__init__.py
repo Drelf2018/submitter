@@ -1,4 +1,5 @@
 from .client import ApiException, Client, OpenAPI, Result, Session, basic_auth
+from .generate import generate_blog_image, generate_contents_image
 from .model import (
     Blog,
     BlogFilter,
@@ -31,4 +32,6 @@ __all__ = [
     "Tests",
     "User",
     "basic_auth",
+    "generate_blog_image",
+    "generate_contents_image",
 ]
