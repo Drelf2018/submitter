@@ -62,24 +62,24 @@ class AliClient(Client):
 async def main(self: AliClient):
     token = await self.register()
     self.log.info(f"Token[{token}]")
+    # 注册完后就可以吧这个函数删了 用下面那个 注意用获取到的 Token 替换下面的空字符串
 
-    @AliClient(ping=30, token=token)
-    async def ali(self: AliClient):
-        async with Weibo(preload=["7198559139"]) as w:
-            for mid in w.blogs:
-                log = await self.test(
-                    blog=w.blogs[mid],
-                    task=Task(
-                        public=True,
-                        enable=True,
-                        name="接收测试",
-                        method="POST",
-                        url="https://httpbin.org/post",
-                        body="{{ json . }}",
-                        README="接收所有微博",
-                    ),
-                )
-                self.log.info(log)
-                break
-
+@AliClient(ping=30, token="")
+async def ali(self: AliClient):
+    async with Weibo(preload=["7198559139"]) as w:
+        for mid in w.blogs:
+            log = await self.test(
+                blog=w.blogs[mid],
+                task=Task(
+                    public=True,
+                    enable=True,
+                    name="接收测试",
+                    method="POST",
+                    url="https://httpbin.org/post",
+                    body="{{ json . }}",
+                    README="接收所有微博",
+                ),
+            )
+            self.log.info(log)
+            break
 ```
