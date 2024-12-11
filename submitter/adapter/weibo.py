@@ -1,5 +1,5 @@
 from datetime import datetime, timedelta
-from typing import Dict, List, Optional
+from typing import Dict, List, Optional, Union
 
 import httpx
 
@@ -10,6 +10,12 @@ from ..model import Blog
 def created_at(text: str) -> Optional[datetime]:
     """
     解析微博时间字段转为 datetime.datetime
+
+    Args:
+        text (str): 时间字符串
+
+    Returns:
+        `datetime` 时间
     """
     if text == "":
         return
@@ -21,6 +27,12 @@ def created_at_comment(text: str) -> Optional[datetime]:
     标准化微博发布时间
 
     参考 https://github.com/Cloud-wish/Dynamic_Monitor/blob/main/main.py#L575
+
+    Args:
+        text (str): 时间字符串
+
+    Returns:
+        `datetime` 时间
     """
     if text == "":
         return
@@ -47,6 +59,12 @@ def created_at_comment(text: str) -> Optional[datetime]:
 def parse_mblog(mblog: dict) -> Optional[Blog]:
     """
     递归解析博文
+
+    Args:
+        mblog (dict): 微博信息字典
+
+    Returns:
+        格式化博文
     """
     if mblog is None:
         return None
@@ -61,9 +79,8 @@ def parse_mblog(mblog: dict) -> Optional[Blog]:
         uid=str(user.get("id", "")),
         mid=str(mblog["mid"]),
         #
-        text=str(mblog.get("raw_text", mblog["text"])),
+        text=str(mblog.get("text", mblog.get("raw_text", ""))),
         time=created_at(mblog.get("created_at", "")),
-        url="https://m.weibo.cn/status/" + mblog.get("bid", ""),
         source=str(mblog.get("region_name", "")),
         edited=mblog.get("edit_config", {}).get("edited", False),
         #
@@ -79,6 +96,12 @@ def parse_mblog(mblog: dict) -> Optional[Blog]:
         },
     )
 
+    bid = mblog.get("bid")
+    if bid is not None:
+        blog.url = "https://m.weibo.cn/status/" + bid
+    else:
+        blog.url = "https://m.weibo.cn/status/" + blog.mid
+
     reply = parse_mblog(mblog.get("retweeted_status"))
     if reply is not None:
         blog.reply = reply
@@ -90,8 +113,7 @@ def parse_mblog(mblog: dict) -> Optional[Blog]:
             url = p.get("videoSrc")
             if url is not None:
                 blog.assets.append(url)
-            else:
-                blog.assets.append(p.get("large", {}).get("url"))
+            blog.assets.append(p.get("large", {}).get("url"))
 
     video = mblog.get("page_info", {}).get("urls", {}).get("mp4_720p_mp4")
     if video is not None:
@@ -111,6 +133,12 @@ def parse_mblog(mblog: dict) -> Optional[Blog]:
 def parse_comment(comment: dict) -> Optional[Blog]:
     """
     解析评论
+
+    Args:
+        comment (dict): 微博评论信息字典
+
+    Returns:
+        格式化博文
     """
     if comment is None:
         return None
@@ -148,7 +176,7 @@ class Weibo:
     微博适配器
     """
 
-    def __init__(self, base_url: str = "https://m.weibo.cn/api", headers: dict | None = None, preload: str | List[str] | None = None):
+    def __init__(self, base_url: str = "https://m.weibo.cn/api", headers: Optional[dict] = None, preload: Union[str, List[str], None] = None):
         self.session = httpx.AsyncClient(base_url=base_url, headers=headers)
         self.get_index_count = 0
         self.blogs: Dict[str, Blog] = {}
@@ -169,6 +197,19 @@ class Weibo:
     async def __aexit__(self, exc_type, exc, tb): ...
 
     async def get_index(self, uid: str, page: int = 1):
+        """
+        获取已发布博文
+
+        Args:
+            uid (str): 用户ID
+            page (int, optional): 起始页
+
+        Raises:
+            ApiException: 接口错误
+
+        Yields:
+            格式化博文
+        """
         resp = await self.session.get(f"/container/getIndex?containerid=107603{uid}&page={page}")
         if resp.status_code != 200:
             raise ApiException(
@@ -184,12 +225,34 @@ class Weibo:
                 yield parse_mblog(card["mblog"])
 
     async def get_new_index(self, uid: str, page: int = 1):
+        """
+        获取新发布博文
+
+        Args:
+            uid (str): 用户ID
+            page (int, optional): 起始页
+
+        Yields:
+            格式化博文
+        """
         async for blog in self.get_index(uid, page):
             if blog.mid not in self.blogs:
                 self.blogs[blog.mid] = blog
                 yield blog
 
     async def get_new_comments(self, blog: Blog):
+        """
+        获取新发布评论
+
+        Args:
+            blog (Blog): 微博博文
+
+        Raises:
+            ApiException: 接口错误
+
+        Yields:
+            该微博下评论
+        """
         resp = await self.session.get("/comments/show?id=" + blog.mid)
         result: dict = resp.json()
         if result["ok"] == 0:
@@ -201,7 +264,7 @@ class Weibo:
             cmt = parse_comment(comment)
             if cmt.mid in self.comments:
                 continue
-            cmt.blog_id = blog.id
+            cmt.comment_id = blog.id
 
             reply = self.comments.get(str(comment.get("reply_id", "")))
             if reply is not None:
@@ -214,7 +277,13 @@ class Weibo:
             yield cmt
 
     def delete_blog(self, blog: Blog):
+        """
+        删除已记录微博及其评论
+
+        Args:
+            blog (Blog): 要删除的微博
+        """
         for cmt in self.comments.values():
-            if cmt.blog_id == blog.id:
+            if cmt.comment_id == blog.id:
                 self.comments.pop(cmt.mid)
         self.blogs.pop(blog.mid)
