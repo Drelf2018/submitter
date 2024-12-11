@@ -591,7 +591,6 @@ async def generate_blog_image(
         contents = await cls.from_html(blog.text.strip(), options.content.color_primary, options.content.color_secondary)
         for content in contents:
             content.font = font_text
-            print(content)
         box_space = font_text.getbbox("中嘞")
 
         image_content = generate_contents_image(contents, width=width - 2 * avatar_x, line_space=(box_space[3] - box_space[1]) // 2)
