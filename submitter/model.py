@@ -11,26 +11,26 @@ class Blog(BaseModel):
     博文
     """
 
-    id: int = None
-    created_at: datetime = None
+    id: Optional[int] = None
+    created_at: Optional[datetime] = None
 
-    submitter: str = None
+    submitter: Optional[str] = None
     platform: str
     type: str
     uid: str
     mid: str
 
-    url: str = None
+    url: Optional[str] = None
     text: str
     time: datetime
-    source: str = None
-    edited: bool = None
+    source: Optional[str] = None
+    edited: Optional[bool] = None
 
     name: str
-    avatar: str = None
-    follower: str = None
-    following: str = None
-    description: str = None
+    avatar: Optional[str] = None
+    follower: Optional[str] = None
+    following: Optional[str] = None
+    description: Optional[str] = None
 
     reply_id: Optional[int] = None
     reply: Optional["Blog"] = None
@@ -42,7 +42,10 @@ class Blog(BaseModel):
     extra: Optional[Dict[str, Any]] = None
 
     def __str__(self):
-        return f'Blog({self.id}, {self.name}, "{self.text}"{", "+str(self.reply) if self.reply is not None else ""})'
+        reply = ""
+        if self.reply is not None:
+            reply = ", " + str(self.reply)
+        return f'Blog({self.mid}, {self.name}, "{self.text}"{reply}) ({self.id})'
 
 
 class Role(Enum):
