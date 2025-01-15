@@ -66,6 +66,41 @@ def paste_image(bg: Image.Image, im: Image.Image, box: Tuple[int, int]):
         bg.paste(im, box)
 
 
+def get_resized_image(
+    im: Image.Image,
+    width: Optional[int] = None,
+    height: Optional[int] = None,
+    resample: Optional[int] = None,
+    reducing_gap: Optional[float] = None,
+):
+    """
+    按比例缩放图像，至少设置宽度或高度之一
+
+    Args:
+        im (Image.Image): 要缩放的图片
+        width (Optional[int]): 新图片宽度
+        height (Optional[int]): 新图片高度
+        resample (Optional[int]): 同 `Image.Image.resize` 函数
+        reducing_gap (Optional[float]): 同 `Image.Image.resize` 函数
+
+    Raises:
+        NotImplementedError: `width` `height` 都为 `None` 时的错误
+
+    Returns:
+        缩放后图片
+    """
+    if width is None:
+        if height is None:
+            raise NotImplementedError
+        width = im.width * height / im.height
+    else:
+        if height is None:
+            height = im.height * width / im.width
+    if im.size == (int(width), int(height)):
+        return im
+    return im.resize((int(width), int(height)), resample=resample, reducing_gap=reducing_gap)
+
+
 def get_rounded_rectangle_alpha(size: Tuple[int, int], radius: Tuple[int, int, int, int, int, int, int, int]) -> Image.Image:
     """
     获取圆角蒙版
@@ -137,34 +172,14 @@ def get_cropped_image(im: Image.Image, ratio: float, offset: int = 0) -> Image.I
         return im.crop((0, top + offset, w, top + new_height + offset))
 
 
-def get_resized_image(im: Image.Image, width: Optional[int] = None, height: Optional[int] = None):
-    """
-    按比例缩放图像，至少设置宽度或高度之一
-
-    Args:
-        im (Image.Image): 要缩放的图片
-        width (Optional[int]): 新图片宽度
-        height (Optional[int]): 新图片高度
-
-    Raises:
-        NotImplementedError: `width` `height` 都为 `None` 时的错误
-
-    Returns:
-        缩放后图片
-    """
-    if width is None:
-        if height is None:
-            raise NotImplementedError
-        width = im.width * height / im.height
-    else:
-        if height is None:
-            height = im.height * width / im.width
-    if im.size == (int(width), int(height)):
-        return im
-    return im.resize((int(width), int(height)), Image.Resampling.LANCZOS)
-
-
-def get_merged_image(images: List[Image.Image], max_width: int, space: Optional[int] = None, radius: Optional[str] = None, number_per_row: Optional[int] = None, max_number_per_row: int = 3) -> Image.Image:
+def get_merged_image(
+    images: List[Image.Image],
+    max_width: int,
+    space: Optional[int] = None,
+    radius: Optional[str] = None,
+    number_per_row: Optional[int] = None,
+    max_number_per_row: int = 3,
+) -> Image.Image:
     """
     拼接图像
 
@@ -179,45 +194,54 @@ def get_merged_image(images: List[Image.Image], max_width: int, space: Optional[
     Returns:
         拼接后图像
     """
+    # 数量计算
     if number_per_row is None or number_per_row <= 0:
         number_per_row = min(max_number_per_row, ceil(sqrt(len(images))))
+    number_per_row = int(number_per_row)
     number_of_rows = ceil(len(images) / number_per_row)
-
-    if space is None:
-        space = round(0.01 * max_width)
-    else:
-        space = round(space)
-    width = int((max_width - (number_per_row - 1) * space) / number_per_row)
-
+    # 尺寸计算
+    space = round(space) if space is not None else round(0.01 * max_width)
+    width = (max_width - (number_per_row - 1) * space) // number_per_row
     bg_width = number_per_row * width + (number_per_row - 1) * space
     bg_height = number_of_rows * width + (number_of_rows - 1) * space
+    # 定位图片
     bg = Image.new("RGBA", (bg_width, bg_height))
-
     for idx in range(len(images)):
         img = get_cropped_image(images[idx], 1)
-        img = get_resized_image(img, width=width)
         img = set_image_border(img, radius=radius)
-        bg.paste(img, ((idx % number_per_row) * (width + space), (idx // number_per_row) * (width + space)), img)
-
+        img = get_resized_image(img, width=width)
+        paste_image(bg, img, ((idx % number_per_row) * (width + space), (idx // number_per_row) * (width + space)))
     return bg
 
 
-def set_image_border(image: Image.Image, radius: Optional[str] = None, width: Optional[str] = None, color: Optional[str] = None, scale: int = 1) -> Image.Image:
+def set_image_border(
+    image: Image.Image,
+    radius: Optional[str] = None,
+    width: Optional[str] = None,
+    color: Optional[str] = None,
+    scale: int = 1,
+) -> Image.Image:
     """
     为图片设置边框
+
+    特殊的，参数 `scale` 为缩放参数，因为处理圆角时会因为精度问题出现锯齿，但是先把图片放大，处理完成后再缩小回来就能减少锯齿。
+
+    该参数默认值为 `1` 即不进行缩放，若希望通过上述方法减小锯齿，设置一个大于 `1` 的数值即可。
+
+    但是，使用该参数后会导致圆角模糊、颜色偏差（因为使用了插值缩放）等问题，请谨慎使用。
 
     Args:
         image (Image.Image): 要设置边框的图片
         radius (Optional[str]): 边框圆角，格式同 CSS
         width (Optional[str]): 边框宽度，格式同 CSS
         color (Optional[str]): 边框颜色，格式同 CSS
-        scale (int, optional): 特殊的，参数 `scale` 为缩放参数，因为处理圆角时会因为精度问题出现锯齿，但是先把图片放大，处理完成后再缩小回来就能减少锯齿。该参数默认值为 `1` 即不进行缩放，若希望通过上述方法减小锯齿，设置一个大于 `1` 的数值即可。
+        scale (int, optional): 缩放参数
 
     Returns:
         设置边框后的图片
     """
     if scale != 1:
-        image = image.resize((scale * image.width, scale * image.height), Image.Resampling.LANCZOS)
+        image = get_resized_image(image, width=scale * image.width)
 
     if image.mode != "RGBA":
         image = image.convert("RGBA")
@@ -227,10 +251,10 @@ def set_image_border(image: Image.Image, radius: Optional[str] = None, width: Op
     else:
         width_top, width_right, width_bottom, width_left = split_value(width)
 
-        width_top = int(calc_length(width_top)) * scale
-        width_right = int(calc_length(width_right)) * scale
-        width_bottom = int(calc_length(width_bottom)) * scale
-        width_left = int(calc_length(width_left)) * scale
+        width_top = int(calc_length(width_top) * scale)
+        width_right = int(calc_length(width_right) * scale)
+        width_bottom = int(calc_length(width_bottom) * scale)
+        width_left = int(calc_length(width_left) * scale)
 
         new_width = image.width + width_left + width_right
         new_height = image.height + width_top + width_bottom
@@ -430,12 +454,12 @@ def set_image_border(image: Image.Image, radius: Optional[str] = None, width: Op
     if width is None:
         if scale == 1:
             return image
-        return image.resize((image.width // scale, image.height // scale), Image.Resampling.LANCZOS)
+        return get_resized_image(image, width=image.width / scale)
     else:
         border.paste(image, (width_left, width_top), image)
         if scale == 1:
             return border
-        return border.resize((border.width // scale, border.height // scale), Image.Resampling.LANCZOS)
+        return get_resized_image(border, width=border.width / scale)
 
 
 if __name__ == "__main__":
@@ -466,4 +490,4 @@ if __name__ == "__main__":
     im = get_merged_image([img, scaled_2_img, scaled_10_img], 640, space=20, number_per_row=3)
     bg = Image.new("RGB", (im.width + 40, im.height + 40), "grey")
     bg.paste(im, (20, 20), im)
-    bg.show()
+    bg.save(__file__.replace(".py", ".png"))

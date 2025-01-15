@@ -1,4 +1,4 @@
-from .content import Align, Content, endl
+from .content import Align, Content, HttpxContent, endl
 from .image import (
     get_cropped_image,
     get_merged_image,
@@ -11,6 +11,7 @@ from .image import (
 __all__ = [
     "Align",
     "Content",
+    "HttpxContent",
     "endl",
     "get_cropped_image",
     "get_merged_image",

@@ -12,8 +12,9 @@ try:
 except:
     cfg = ["v0.0.0"]
 
+# python setup.py develop
 setuptools.setup(
-    name="post-submitter",
+    name="post_submitter",
     version=cfg[0],
     license="MIT",
     author="Drelf2018",

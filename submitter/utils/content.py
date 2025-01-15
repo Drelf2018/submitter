@@ -5,6 +5,7 @@ from re import compile
 from typing import List, Optional, Tuple, Union
 
 from emoji import is_emoji
+from httpx import AsyncClient
 from lxml import etree
 from PIL import Image
 from PIL.ImageFont import FreeTypeFont
@@ -105,7 +106,7 @@ class Content:
             return self.value
         return self.value.resize(self.size, Image.Resampling.LANCZOS)
 
-    def split(self, idx: int) -> Tuple["Content", "Content"]:
+    def image(self, idx: int) -> Tuple["Content", "Content"]:
         """
         分割文本内容（未检查边界）
 
@@ -115,27 +116,6 @@ class Content:
         if not isinstance(self.value, str):
             raise NotImplementedError
         return Content(self.value[:idx], self.font, self.color), Content(self.value[idx:], self.font, self.color)
-
-    def split_by_width(self, max_width: int) -> Tuple["Content", "Content"]:
-        """
-        根据最大宽度分割文本内容
-
-        Returns:
-            根据最大宽度分割开的两个文本内容，字体与颜色与原先一致
-        """
-        if not isinstance(self.value, str):
-            raise NotImplementedError
-        left, middle, right = 0, len(self.value), len(self.value)
-        while left < right:
-            width = self.font.getlength(self.value[:middle])
-            if width < max_width:
-                left = middle + 1
-            elif width == max_width:
-                return self.split(middle)
-            else:
-                right = middle
-            middle = (left + right) // 2
-        return self.split(left - 1)
 
     @classmethod
     async def get_emoji(cls, emoji: str) -> Union[str, Image.Image, None]:
@@ -234,7 +214,7 @@ class Content:
                     append(emoji, scale=1)
                 # 图片获取失败 把这个 emoji 以文本添加 说不定后续使用的字体是含有 emoji 的
                 elif isinstance(emoji, str):
-                    append(emoji, color=color)
+                    append(emoji, new_color=color)
                 idx += 2
             elif is_emoji(text[idx]):
                 # 逻辑同上
@@ -242,7 +222,7 @@ class Content:
                 if isinstance(emoji, Image.Image):
                     append(emoji, scale=1)
                 elif isinstance(emoji, str):
-                    append(emoji, color=color)
+                    append(emoji, new_color=color)
                 idx += 1
             elif text[idx] == "\n":
                 append(endl())
@@ -290,3 +270,67 @@ class Content:
             else:
                 raise NotImplementedError
         return contents
+
+
+class HttpxContent(Content):
+    """
+    类 `Content` 的 `httpx.AsyncClient` 实现
+
+    ```
+    # 切换 emoji 源
+    class AppleContent(HttpxContent):
+        source = [HttpxContent.apple]
+    ```
+    """
+
+    session = AsyncClient()
+
+    huawei: str = "https://www.emojiall.com/images/120/huawei/"
+    apple: str = "https://www.emojiall.com/images/120/apple/ios-17.4/"
+    samsung: str = "https://www.emojiall.com/images/240/samsung/one-ui-6.1/"
+    twitter: str = "https://www.emojiall.com/images/240/twitter/twemoji-15.0.1/"
+
+    source = [huawei, apple, samsung, twitter]  # 可继承此类后修改这个值实现换源 更多源请自行访问该网站查找
+
+    @classmethod
+    async def get(cls, url: str) -> Union[str, Image.Image, None]:
+        resp = await cls.session.get(url)
+        if resp.status_code != 200:
+            return None
+        if not resp.headers["Content-Type"].startswith("image"):
+            return None
+        return Image.open(BytesIO(resp.content))
+
+    @classmethod
+    async def retry(cls, url: str, num: int = 3) -> Union[str, Image.Image, None]:
+        for _ in range(1, num):
+            try:
+                return await cls.get(url)
+            except:
+                pass
+        return await cls.get(url)
+
+    @classmethod
+    async def get_image(cls, url: str) -> Union[str, Image.Image, None]:
+        try:
+            return await cls.retry(url)
+        except:
+            return None
+
+    @classmethod
+    async def get_emoji(cls, emoji: str) -> Union[str, Image.Image, None]:
+        filename = "-".join("%x" % ord(chn) for chn in emoji)
+        for source in cls.source:
+            try:
+                img = await cls.get(f"{source}{filename}.png")
+                if img is not None:
+                    return img
+            except:
+                pass
+        return emoji
+
+
+if __name__ == "__main__":
+    import asyncio
+
+    asyncio.run(HttpxContent.get_emoji("🏳️‍⚧️")).show()
