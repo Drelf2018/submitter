@@ -11,41 +11,42 @@ class Blog(BaseModel):
     博文
     """
 
-    id: Optional[int] = None
-    created_at: Optional[datetime] = None
+    id: Optional[int] = None  # 数据库内序号
+    created_at: Optional[datetime] = None  # 数据库内创建时间
 
-    submitter: Optional[str] = None
-    platform: str
-    type: str
-    uid: str
-    mid: str
+    submitter: Optional[str] = None  # 博文提交者
+    platform: str  # 发布平台
+    type: str  # 博文类型
+    uid: str  # 账户序号
+    mid: str  # 博文序号
 
-    url: Optional[str] = None
-    text: str
-    time: datetime
-    source: Optional[str] = None
-    edited: Optional[bool] = None
+    url: Optional[str] = None  # 博文网址
+    text: str  # 文本内容
+    time: datetime  # 发送时间
+    title: Optional[str] = None  # 博文标题
+    source: Optional[str] = None  # 博文来源
+    edited: Optional[bool] = None  # 是否编辑
 
-    name: str
-    avatar: Optional[str] = None
-    follower: Optional[str] = None
-    following: Optional[str] = None
-    description: Optional[str] = None
+    name: Optional[str] = None  # 账户昵称
+    avatar: Optional[str] = None  # 头像网址
+    follower: Optional[str] = None  # 粉丝数量
+    following: Optional[str] = None  # 关注数量
+    description: Optional[str] = None  # 个人简介
 
-    reply_id: Optional[int] = None
-    reply: Optional["Blog"] = None
-    comment_id: Optional[int] = None
-    comments: Optional[List["Blog"]] = None
+    reply_id: Optional[int] = None  # 被本文回复的博文序号
+    reply: Optional["Blog"] = None  # 被本文回复的博文
+    comment_id: Optional[int] = None  # 被本文评论的博文序号
+    comments: Optional[List["Blog"]] = None  # 本文的评论
 
-    assets: Optional[List[str]] = None
-    banner: Optional[List[str]] = None
-    extra: Optional[Dict[str, Any]] = None
+    assets: Optional[List[str]] = None  # 资源网址
+    banner: Optional[List[str]] = None  # 头图网址
+    extra: Optional[Dict[str, Any]] = None  # 预留项
 
     def __str__(self):
         reply = ""
         if self.reply is not None:
             reply = ", " + str(self.reply)
-        return f'Blog({self.mid}, {self.name}, "{self.text}"{reply}) ({self.id})'
+        return f'Blog({self.name}, "{self.text}", {self.mid}{reply})'
 
 
 class Role(Enum):
@@ -65,23 +66,22 @@ class RequestLog(BaseModel):
     请求记录
     """
 
-    blog_id: int
-    created_at: datetime
-    finished_at: datetime
-    raw_result: str = None
-    result: Optional[Any] = None
-    error: str = None
+    blog_id: int  # 该记录发送的博文序号
+    created_at: datetime  # 开始请求时间
+    finished_at: datetime  # 结束请求时间
+    result: Any  # 响应为 JSON 会自动解析
+    error: str  # 请求过程中发生的错误
 
 
 class Filter(BaseModel):
     """
-    博文筛选条件
+    筛选条件
     """
 
-    submitter: str = None
-    platform: str = None
-    type: str = None
-    uid: str = None
+    submitter: str = ""  # 博文提交者
+    platform: str = ""  # 发布平台
+    type: str = ""  # 博文类型
+    uid: str = ""  # 账户序号
 
 
 class Task(BaseModel):
@@ -89,23 +89,24 @@ class Task(BaseModel):
     任务
     """
 
-    id: int = None
-    created_at: datetime = None
+    id: Optional[int] = None  # 任务序号
+    created_at: Optional[datetime] = None  # 任务创建时间
 
-    public: bool = None
-    enable: bool = None
-    name: str
-    method: str
-    url: str
-    body: str = None
-    header: Optional[Dict[str, str]] = None
-    README: str = None
-    fork_id: int = None
-    fork_count: int = None
+    public: Optional[bool] = None  # 是否公开
+    enable: Optional[bool] = None  # 是否启用
+    name: Optional[str] = None  # 任务名称
+    icon: Optional[str] = None  # 任务图标
+    method: Optional[str] = None  # 请求方法
+    url: Optional[str] = None  # 请求地址
+    body: Optional[str] = None  # 请求内容
+    header: Optional[Dict[str, str]] = None  # 请求头部
+    readme: Optional[str] = None  # 任务描述
+    fork_id: Optional[int] = None  # 复刻来源
+    fork_count: Optional[int] = None  # 被复刻次数
 
-    filters: Optional[List[Filter]] = None
-    logs: Optional[List[RequestLog]] = None
-    user_id: str = None
+    filters: Optional[List[Filter]] = None  # 筛选条件
+    logs: Optional[List[RequestLog]] = None  # 请求记录
+    user_id: Optional[str] = None  # 所有者
 
 
 class User(BaseModel):
@@ -113,72 +114,47 @@ class User(BaseModel):
     用户
     """
 
-    uid: str
-    created_at: datetime
-    ban: datetime
-    role: Role
-    name: str
-    nickname: str
-    tasks: Optional[List[Task]] = None
+    uid: str  # 用户序号
+    created_at: datetime  # 建号时间
+    ban: datetime  # 封禁结束时间
+    role: Role  # 权限等级
+    name: str  # 用户名
+    nickname: str  # 昵称
+    tasks: List[Task]  # 任务集
 
 
-class Test(BaseModel):
+class Version(BaseModel):
     """
-    测试任务
-    """
-
-    blog: Blog
-    task: Task
-
-
-class Tests(BaseModel):
-    """
-    测试任务集
+    版本信息
     """
 
-    blog: Blog
-    tasks: List[int]
+    api: str  # 后端版本
+    env: str  # 后端环境
+    start: datetime  # 启动时间
+    index: Optional[List[str]] = None  # 主页文件
 
 
-class BlogQuery(BaseModel):
+class Condition(BaseModel):
     """
     查询条件
     """
 
-    submitter: str = None
-    platform: str = None
-    type: str = None
-    uid: str = None
-    mid: str = None
-    reply: bool = None
-    comments: bool = None
-    order: str = None
-    limit: int = None
-    offset: int = None
-    conds: List[str] = None
-
-    def items(self):
-        return self.model_dump().items()
-
-
-class BlogFilter(BaseModel):
-    """
-    筛选条件
-    """
-
-    filters: List[Filter]
-    reply: bool = None
-    comments: bool = None
-    order: str = None
-    limit: int = None
-    offset: int = None
-    conds: List[str] = None
+    reply: bool = True  # 是否包含转发
+    comments: bool = True  # 是否包含评论
+    order: str = "time desc"  # 查询排列顺序
+    limit: int = 30  # 查询行数
+    offset: int = 0  # 查询偏移
+    conds: Optional[List[str]] = None  # 其他条件
 
 
 class PatchBody(BaseModel):
-    op: str
-    path: str
-    value: str = None
+    """
+    PATCH 请求体
+    """
+
+    op: str  # 操作类型，一般使用 `replace` 表示替换、`add` 表示添加、`remove` 表示移除
+    path: str  # 操作路径，一般表示要操作的资源
+    value: str = None  # 操作数据，一般表示替换、添加操作时的新值
 
     def dumps(self, obj):
         self.value = json.dumps(obj, ensure_ascii=False)
