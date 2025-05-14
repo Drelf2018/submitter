@@ -1,9 +1,9 @@
 from datetime import datetime, timedelta
-from typing import Dict, List, Optional, Union
+from typing import Any, Dict, List, Optional, Union
 
-import httpx
+from pydantic import BaseModel
 
-from ..client import ApiException
+from ..client import ApiException, Session
 from ..model import Blog
 
 
@@ -171,14 +171,32 @@ def parse_comment(comment: dict) -> Optional[Blog]:
     return blog
 
 
-class Weibo:
+class Result(BaseModel):
+    ok: Optional[int] = None
+    data: Optional[Any] = None
+    msg: Optional[str] = None
+
+
+class Weibo(Session):
     """
     微博适配器
     """
 
-    def __init__(self, base_url: str = "https://m.weibo.cn/api", headers: Optional[dict] = None, preload: Union[str, List[str], None] = None):
-        self.session = httpx.AsyncClient(base_url=base_url, headers=headers)
-        self.get_index_count = 0
+    def __init__(
+        self,
+        base_url: str = "https://m.weibo.cn/api",
+        headers: Optional[dict] = None,
+        cookies: Optional[dict] = None,
+        preload: Union[str, List[str], None] = None,
+    ):
+        """
+        Args:
+            base_url (str): 基础接口地址
+            headers (dict): 请求头
+            cookies (dict): Cookies
+            preload (Union[str, List[str], None]): 预加载给定博主的微博
+        """
+        Session.__init__(self, base_url, headers=headers, cookies=cookies)
         self.blogs: Dict[str, Blog] = {}
         self.comments: Dict[str, Blog] = {}
         if preload is None:
@@ -190,11 +208,27 @@ class Weibo:
 
     async def __aenter__(self):
         for uid in self.preload:
-            async for blog in self.get_index(uid):
-                self.blogs[blog.mid] = blog
+            try:
+                async for blog in self.get_index(uid):
+                    self.blogs[blog.mid] = blog
+            except:
+                pass
         return self
 
     async def __aexit__(self, exc_type, exc, tb): ...
+
+    async def request(self, method: str, url: str, *args, **kwargs):
+        """
+        检查业务码的请求
+
+        Args:
+            method (str): 请求方法
+            url (str): 请求地址
+        """
+        r = Result.model_validate_json(await super().request(method, url, *args, **kwargs))
+        if r.ok != 1:
+            raise ApiException(r.ok, r.msg)
+        return r.data
 
     async def get_index(self, uid: str, page: int = 1):
         """
@@ -210,19 +244,12 @@ class Weibo:
         Yields:
             格式化博文
         """
-        resp = await self.session.get(f"/container/getIndex?containerid=107603{uid}&page={page}", timeout=20)
-        if resp.status_code != 200:
-            raise ApiException(
-                code=resp.status_code,
-                error=f"<Response [{resp.status_code}]>",
-            )
-        result: dict = resp.json()
-        if result["ok"] != 1:
-            raise ApiException(code=result["ok"], error=result.get("msg", ""), data=result)
-        self.get_index_count += 1
-        for card in result["data"]["cards"]:
-            if card["card_type"] == 9:
-                yield parse_mblog(card["mblog"])
+        r: Dict[str, List[dict]] = await self.get(f"/container/getIndex?containerid=107603{uid}&page={page}", timeout=20)
+        for card in r.get("cards", []):
+            if card.get("card_type") == 9:
+                blog = parse_mblog(card.get("mblog"))
+                if blog is not None:
+                    yield blog
 
     async def get_new_index(self, uid: str, page: int = 1):
         """
@@ -231,6 +258,9 @@ class Weibo:
         Args:
             uid (str): 用户ID
             page (int, optional): 起始页
+
+        Raises:
+            ApiException: 接口错误
 
         Yields:
             格式化博文
@@ -253,32 +283,40 @@ class Weibo:
         Yields:
             该微博下评论
         """
-        resp = await self.session.get("/comments/show?id=" + blog.mid)
-        result: dict = resp.json()
-        if result["ok"] == 0:
-            return
-        elif result["ok"] != 1:
-            raise ApiException(code=result["ok"], error=result.get("msg", ""), data=result)
-
-        for comment in result["data"]["data"][::-1]:
-            cmt = parse_comment(comment)
-            if cmt.mid in self.comments:
+        r: Dict[str, List[dict]] = await self.get(f"/comments/show?id={blog.mid}")
+        for data in r.get("data", [])[::-1]:  # 从旧到新
+            comment = parse_comment(data)
+            if comment.mid in self.comments:
                 continue
-            cmt.comment_id = blog.id
+            comment.comment_id = blog.id
 
-            reply = self.comments.get(str(comment.get("reply_id", "")))
+            reply = self.comments.get(str(data.get("reply_id", "")))
             if reply is not None:
                 if reply.id is not None:
-                    cmt.reply_id = reply.id
+                    comment.reply_id = reply.id
                 else:
-                    cmt.reply = reply
+                    comment.reply = reply
 
-            self.comments[cmt.mid] = cmt
-            yield cmt
+            self.comments[comment.mid] = comment
+            yield comment
+
+    async def create_comment(self, mid: str, comment: str, is_repost: int = 0) -> dict:
+        """
+        发布评论
+
+        Args:
+            mid (str): 微博平台内博文的序号
+            comment (str): 评论内容
+            is_repost (int): 是否同时转发
+
+        Returns:
+            一个字段非常多的字典，非常不建议细究返回值，捕获错误就好了
+        """
+        return await self.post("https://weibo.com/ajax/comments/create", data={"id": mid, "comment": comment, "is_repost": is_repost})
 
     def delete_blog(self, blog: Blog):
         """
-        删除已记录微博及其评论
+        删除本地记录的微博及其评论
 
         Args:
             blog (Blog): 要删除的微博

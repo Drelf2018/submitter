@@ -50,12 +50,12 @@ class Session:
     基于 `httpx.AsyncClient`
     """
 
-    def __init__(self, base_url: str):
+    def __init__(self, base_url: str, *args, **kwargs):
         """
         Args:
             base_url (str): 基础接口地址
         """
-        self.session = httpx.AsyncClient(base_url=base_url)
+        self.session = httpx.AsyncClient(base_url=base_url, *args, **kwargs)
 
     def set_token(self, token: str):
         """
@@ -118,8 +118,7 @@ class OpenAPI(Session):
             method (str): 请求方法
             url (str): 请求地址
         """
-        data = await super().request(method, url, *args, **kwargs)
-        r = Result.model_validate_json(data)
+        r = Result.model_validate_json(await super().request(method, url, *args, **kwargs))
         if r.code != 0:
             raise ApiException(r.code, r.error)
         return r.data
