@@ -1,8 +1,5 @@
 APScheduler==3.10.4
-emoji==2.14.0
 httpx==0.28.0
 loguru==0.7.2
-lxml==5.3.0
 Pillow==11.0.0
 pydantic==2.10.2
-qrcode==7.4.2
