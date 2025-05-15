@@ -552,7 +552,7 @@ class Client(OpenAPI):
 
         loop = asyncio.new_event_loop()
         asyncio.set_event_loop(loop)
-        loop.create_task(self.catch(main)())
+        loop.create_task(self.catch(main, 2)())
         try:
             loop.run_forever()
         except KeyboardInterrupt:
@@ -563,12 +563,13 @@ class Client(OpenAPI):
     def stop(self):
         asyncio.get_event_loop().stop()
 
-    def catch(self, fn: Coroutine):
+    def catch(self, fn: Coroutine, depth: int = 1):
         """
         捕获错误
 
         Args:
             fn (Coroutine): 要运行的异步函数
+            depth (int): 打印错误时翻越错误栈层数
         """
 
         async def wrapper(*args, **kwargs):
@@ -579,8 +580,11 @@ class Client(OpenAPI):
                     msg = type(e).__name__
                     if str(e) != "":
                         msg += f": {str(e)}"
-                    name = Path(e.__traceback__.tb_next.tb_frame.f_code.co_filename).stem
-                    line = e.__traceback__.tb_next.tb_frame.f_lineno
+                    traceback = e.__traceback__
+                    for _ in range(depth):
+                        traceback = traceback.tb_next
+                    name = Path(traceback.tb_frame.f_code.co_filename).stem
+                    line = traceback.tb_frame.f_lineno
                     function = fn.__name__
 
                     def modify_record(record):
