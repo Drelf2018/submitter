@@ -159,3 +159,14 @@ class PatchBody(BaseModel):
     def dumps(self, obj):
         self.value = json.dumps(obj, ensure_ascii=False)
         return self
+
+
+class Test(BaseModel):
+    """
+    任务测试请求体
+    """
+
+    blog: Optional[Blog] = None
+    task: Optional[Task] = None
+    blog_id: int = 0
+    task_id: Optional[List[int]] = None

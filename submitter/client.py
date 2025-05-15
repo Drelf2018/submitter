@@ -481,16 +481,8 @@ class OpenAPI(Session):
         Returns:
             请求记录
         """
-        data = {}
-        if blog is not None:
-            data["blog"] = blog.model_dump()
-        if task is not None:
-            data["task"] = task.model_dump()
-        if blog_id != 0:
-            data["blog_id"] = blog_id
-        if task_id is not None:
-            data["task_id"] = task_id
-        r = await self.post("/api/test", json=data)
+        data = model.Test(blog=blog, task=task, blog_id=blog_id, task_id=task_id)
+        r = await self.post("/api/test", data=data.model_dump_json())
         logs = []
         for log in r:
             logs.append(model.RequestLog.model_validate(log))
