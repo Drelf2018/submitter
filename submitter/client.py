@@ -502,27 +502,29 @@ class Client(OpenAPI):
     客户端
     """
 
-    def __init__(self, base_url: str, uid: str = "", password: str = "", token: str = "", ping: float = -1):
+    def __init__(self, base_url: str, uid: str = "", password: str = "", token: str = "", log: bool = True, ping: float = -1):
         """
         Args:
             base_url (str): 接口基础地址
             uid (str): 用户序号
             password (str): 密码
             token (str): JWT 鉴权码
+            log (bool): 是否将日志打印在文件
             ping (float): 与后端心跳间隔秒数，非正数则不开启
         """
         OpenAPI.__init__(self, base_url, token)
         self.uid = uid
         self.password = password
         self.log = loguru.logger
-        self.log.add(
-            sink="{time:YYYY-MM-DD}.log",
-            level="ERROR",
-            rotation="00:00",
-            encoding="utf-8",
-            enqueue=True,
-            format="<green>{time:YYYY-MM-DD HH:mm:ss}</green> | " "<level>{level}</level> | " "<cyan>{name}.{function}</cyan>:<cyan>{line}</cyan> | <level>{message}</level>",
-        )
+        if log:
+            self.log.add(
+                sink="{time:YYYY-MM-DD}.log",
+                level="ERROR",
+                rotation="00:00",
+                encoding="utf-8",
+                enqueue=True,
+                format="<green>{time:YYYY-MM-DD HH:mm:ss}</green> | " "<level>{level}</level> | " "<cyan>{name}.{function}</cyan>:<cyan>{line}</cyan> | <level>{message}</level>",
+            )
         self.scheduler = AsyncIOScheduler(timezone="Asia/Shanghai")
         if ping > 0:
             self.add_job(self.ping, interval=ping, delay=ping)
