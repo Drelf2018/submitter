@@ -312,6 +312,15 @@ class Weibo(Session):
         Returns:
             一个字段非常多的字典，非常不建议细究返回值，捕获错误就好了
         """
+        required_headers = {
+            "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/90.0.4430.212 Safari/537.36",
+            "Referer": "https://weibo.com/",
+            "X-Requested-With": "XMLHttpRequest",
+            "X-Xsrf-Token": self.session.cookies.get("XSRF-TOKEN")
+        }
+        for k, v in required_headers.items():
+            if self.session.headers.get(k) is None:
+                self.session.headers[k] = v
         return await self.post("https://weibo.com/ajax/comments/create", data={"id": mid, "comment": comment, "is_repost": is_repost})
 
     def delete_blog(self, blog: Blog):
