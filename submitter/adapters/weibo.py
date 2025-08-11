@@ -173,7 +173,7 @@ def parse_comment(comment: dict) -> Optional[Blog]:
 
 class Result(BaseModel):
     ok: Optional[int] = None
-    data: Optional[Any] = None
+    data: Any = None
     msg: Optional[str] = None
 
 
@@ -225,9 +225,10 @@ class Weibo(Session):
             method (str): 请求方法
             url (str): 请求地址
         """
-        r = Result.model_validate_json(await super().request(method, url, *args, **kwargs))
+        data = await super().request(method, url, *args, **kwargs)
+        r = Result.model_validate_json(data)
         if r.ok != 1:
-            raise ApiException(r.ok, r.msg)
+            raise ApiException(r.ok, r.msg, data)
         return r.data
 
     async def get_index(self, uid: str, page: int = 1):
@@ -300,7 +301,7 @@ class Weibo(Session):
             self.comments[comment.mid] = comment
             yield comment
 
-    async def create_comment(self, mid: str, comment: str, is_repost: int = 0) -> dict:
+    async def create_comment(self, mid: str, comment: str, is_repost: int = 0):
         """
         发布评论
 
@@ -312,16 +313,17 @@ class Weibo(Session):
         Returns:
             一个字段非常多的字典，非常不建议细究返回值，捕获错误就好了
         """
-        required_headers = {
-            "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/90.0.4430.212 Safari/537.36",
-            "Referer": "https://weibo.com/",
-            "X-Requested-With": "XMLHttpRequest",
-            "X-Xsrf-Token": self.session.cookies.get("XSRF-TOKEN")
-        }
-        for k, v in required_headers.items():
-            if self.session.headers.get(k) is None:
-                self.session.headers[k] = v
-        return await self.post("https://weibo.com/ajax/comments/create", data={"id": mid, "comment": comment, "is_repost": is_repost})
+        return await self.post(
+            "https://www.weibo.com/ajax/comments/create",
+            data={"id": mid, "comment": comment, "is_repost": is_repost},
+            headers={
+                "Accept": "application/json, text/plain, */*",
+                "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/90.0.4430.212 Safari/537.36",
+                "Referer": "https://www.weibo.com/",
+                "X-Requested-With": "XMLHttpRequest",
+                "X-Xsrf-Token": self.session.cookies.get("XSRF-TOKEN"),
+            },
+        )
 
     def delete_blog(self, blog: Blog):
         """

@@ -31,15 +31,16 @@ def replace_url(url: str) -> str:
 
 
 class ApiException(Exception):
-    def __init__(self, code: int, error: str):
-        self.code = code
+    def __init__(self, error: str, code: int, data: Any = None):
+        super().__init__(f"{error} ({code})")
         self.error = error
-        super().__init__(f"{self.error} ({self.code})")
+        self.code = code
+        self.data = data
 
 
 class Result(BaseModel):
     code: int
-    data: Optional[Any] = None
+    data: Any = None
     error: Optional[str] = ""
 
 
@@ -69,18 +70,23 @@ class Session:
         """
         return self.session.headers["Authorization"]
 
-    async def request(self, method: str, url: str, *args, **kwargs) -> bytes:
+    async def request(self, method: str, url: str, *args, **kwargs):
         """
-        基础请求，仅检查状态码是否为 200 OK
+        基础请求，仅检查状态码是否为 2XX
 
         Args:
             method (str): 请求方法
             url (str): 请求地址
+
+        Raises:
+            ApiException: 接口错误
         """
         resp = await self.session.request(method, url, *args, **kwargs)
-        if resp.status_code != 200:
-            raise ApiException(resp.status_code, f"<Response [{resp.status_code}]>")
-        return resp.content
+        try:
+            resp.raise_for_status()
+        except Exception as e:
+            raise ApiException(str(e), resp.status_code, resp.text)
+        return resp.text
 
     async def get(self, url: str, *args, **kwargs):
         return await self.request("GET", url, *args, **kwargs)
@@ -110,7 +116,7 @@ class OpenAPI(Session):
         Session.__init__(self, base_url)
         self.set_token(token)
 
-    async def request(self, method: str, url: str, *args, **kwargs) -> Optional[Any]:
+    async def request(self, method: str, url: str, *args, **kwargs) -> Any:
         """
         检查业务码的请求
 
